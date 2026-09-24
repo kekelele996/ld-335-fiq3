@@ -107,13 +107,20 @@ func migrateAndSeed(db *gorm.DB, cfg config.Config, log *slog.Logger) error {
 		return err
 	}
 	if tableCount > 0 {
-		// init.sql 已建表：修复种子调用方的 API Key 哈希（与当前 API_KEY_SECRET 一致）
+		// init.sql 已建表：升级日终对账表结构，并修复种子调用方的 API Key 哈希
+		if err := migrateDailyReconciliations(db); err != nil {
+			return err
+		}
 		return syncDemoClientHashes(db, cfg)
 	}
 	if err := db.AutoMigrate(
 		&model.ApiClient{}, &model.InsuredPerson{}, &model.UploadBatch{}, &model.FeeItem{},
 		&model.Presettlement{}, &model.SettlementOrder{}, &model.DailyReconciliation{}, &model.AuditLog{},
 	); err != nil {
+		return err
+	}
+	// 早期版本（单列唯一索引）升级到按调用方隔离的复合唯一索引
+	if err := migrateDailyReconciliations(db); err != nil {
 		return err
 	}
 	// 种子调用方（管理端演示）
@@ -136,6 +143,37 @@ func migrateAndSeed(db *gorm.DB, cfg config.Config, log *slog.Logger) error {
 	}
 	log.Info(constants.LOG_DB_INITIALIZED, "seed", "ok")
 	return syncDemoClientHashes(db, cfg)
+}
+
+// migrateDailyReconciliations 将早期「按日期单列唯一」的日终对账表升级为
+// 「调用方 + 自然日」复合唯一，并补齐冲正/净额列。幂等，可重复执行。
+func migrateDailyReconciliations(db *gorm.DB) error {
+	stmts := []string{
+		`ALTER TABLE daily_reconciliations ADD COLUMN IF NOT EXISTS client_id BIGINT NOT NULL DEFAULT 0`,
+		`ALTER TABLE daily_reconciliations ADD COLUMN IF NOT EXISTS reversed_count BIGINT DEFAULT 0`,
+		`ALTER TABLE daily_reconciliations ADD COLUMN IF NOT EXISTS reversed_amount DOUBLE PRECISION DEFAULT 0`,
+		`ALTER TABLE daily_reconciliations ADD COLUMN IF NOT EXISTS net_amount DOUBLE PRECISION DEFAULT 0`,
+		`ALTER TABLE daily_reconciliations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()`,
+		// 旧版 init.sql 的列级唯一约束/索引
+		`ALTER TABLE daily_reconciliations DROP CONSTRAINT IF EXISTS daily_reconciliations_reconcile_date_key`,
+		`DROP INDEX IF EXISTS idx_daily_reconciliations_reconcile_date`,
+	}
+	for _, stmt := range stmts {
+		if err := db.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
+	// 复合唯一索引（IF NOT EXISTS 不能与 CREATE UNIQUE INDEX 直接组合，先查后建）
+	var exists int64
+	if err := db.Raw(`SELECT COUNT(*) FROM pg_indexes WHERE indexname = 'uk_recon_client_date'`).Scan(&exists).Error; err != nil {
+		return err
+	}
+	if exists == 0 {
+		if err := db.Exec(`CREATE UNIQUE INDEX uk_recon_client_date ON daily_reconciliations(client_id, reconcile_date)`).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // syncDemoClientHashes 确保演示调用方使用当前 API_KEY_SECRET 生成的哈希（init.sql 占位哈希不匹配）。

@@ -43,12 +43,9 @@ func (r *SettlementOrderRepository) ExistsByNo(no string) (bool, error) {
 // Update 更新结算单。
 func (r *SettlementOrderRepository) Update(order *model.SettlementOrder) error { return r.db.Save(order).Error }
 
-// List 分页查询。
+// List 分页查询（固定按调用方隔离，可选状态过滤）。
 func (r *SettlementOrderRepository) List(clientID uint, status string, page, pageSize int) ([]model.SettlementOrder, int64, error) {
-	q := r.db.Model(&model.SettlementOrder{})
-	if clientID > 0 {
-		q = q.Where("client_id = ?", clientID)
-	}
+	q := r.db.Model(&model.SettlementOrder{}).Where("client_id = ?", clientID)
 	if status != "" {
 		q = q.Where("status = ?", status)
 	}
@@ -57,18 +54,15 @@ func (r *SettlementOrderRepository) List(clientID uint, status string, page, pag
 		return nil, 0, err
 	}
 	var orders []model.SettlementOrder
-	err := r.db.Where("client_id = ?", clientID).Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&orders).Error
+	err := q.Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&orders).Error
 	return orders, total, err
 }
 
-// TodaySettled 当日已结算（对账，date 为 Asia/Shanghai 日期串）。
-func (r *SettlementOrderRepository) TodaySettled(clientID uint, date string) ([]model.SettlementOrder, error) {
+// SettledOnDate 查询某调用方在指定自然日（Asia/Shanghai 日期串）已正式结算的订单。
+// 已冲正订单同样按原结算日计入，由服务层按状态汇总。
+func (r *SettlementOrderRepository) SettledOnDate(clientID uint, date string) ([]model.SettlementOrder, error) {
 	var orders []model.SettlementOrder
-	q := r.db.Where("settled_at::date = ?", date)
-	if clientID > 0 {
-		q = q.Where("client_id = ?", clientID)
-	}
-	err := q.Find(&orders).Error
+	err := r.db.Where("client_id = ? AND date(settled_at) = ?", clientID, date).Find(&orders).Error
 	return orders, err
 }
 

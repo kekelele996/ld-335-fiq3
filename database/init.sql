@@ -82,14 +82,21 @@ CREATE INDEX IF NOT EXISTS idx_order_client ON settlement_orders(client_id, stat
 
 CREATE TABLE IF NOT EXISTS daily_reconciliations (
     id BIGSERIAL PRIMARY KEY,
-    reconcile_date VARCHAR(10) UNIQUE NOT NULL,
+    client_id BIGINT NOT NULL,
+    reconcile_date VARCHAR(10) NOT NULL,
     total_count BIGINT DEFAULT 0,
     total_amount DOUBLE PRECISION DEFAULT 0,
     success_count BIGINT DEFAULT 0,
+    reversed_count BIGINT DEFAULT 0,
+    reversed_amount DOUBLE PRECISION DEFAULT 0,
+    net_amount DOUBLE PRECISION DEFAULT 0,
     fail_count BIGINT DEFAULT 0,
     abnormal_orders BIGINT DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT now()
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT uk_recon_client_date UNIQUE (client_id, reconcile_date)
 );
+CREATE INDEX IF NOT EXISTS idx_recon_client_date ON daily_reconciliations(client_id, reconcile_date);
 
 CREATE TABLE IF NOT EXISTS audit_logs (
     id BIGSERIAL PRIMARY KEY,

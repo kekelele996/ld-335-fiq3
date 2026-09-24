@@ -513,7 +513,14 @@ const docTemplate = `{
                     "reconciliations"
                 ],
                 "summary": "对账记录列表",
+                "description": "仅返回当前登录调用方自己的对账记录，可通过 date 指定自然日回查",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "自然日 YYYY-MM-DD，不传则返回全部日期",
+                        "name": "date",
+                        "in": "query"
+                    },
                     {
                         "type": "integer",
                         "description": "页码",
@@ -547,16 +554,16 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "返回当日总笔数、总金额、成功/失败笔数",
+                "description": "返回当前调用方指定自然日（默认今天）的原结算笔数/金额、冲正笔数/金额与净额；重复汇总仅覆盖该调用方自己的记录",
                 "tags": [
                     "reconciliations"
                 ],
                 "summary": "日终对账",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "调用方 ID",
-                        "name": "client_id",
+                        "type": "string",
+                        "description": "对账日期 YYYY-MM-DD，默认今天（可回查历史日期并重算）",
+                        "name": "date",
                         "in": "query"
                     }
                 ],
@@ -572,6 +579,7 @@ const docTemplate = `{
         },
         "/api/v1/settlements": {
             "get": {
+                "description": "仅返回当前登录调用方自己的结算单",
                 "security": [
                     {
                         "ApiKeyAuth": []

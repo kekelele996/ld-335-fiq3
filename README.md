@@ -118,8 +118,8 @@ ld-335/
 | POST | `/api/v1/settlements/:settlement_no/reverse` | X-API-Key + JWT | 结算冲正 |
 | GET | `/api/v1/settlements` | X-API-Key + JWT | 结算单列表 |
 | GET | `/api/v1/settlements/:settlement_no` | X-API-Key + JWT | 结算单详情 |
-| GET | `/api/v1/reconciliations/daily` | X-API-Key + JWT | 日终对账 |
-| GET | `/api/v1/reconciliations` | X-API-Key + JWT | 对账记录列表 |
+| GET | `/api/v1/reconciliations/daily` | X-API-Key + JWT | 日终对账（按登录调用方，可传 `date=YYYY-MM-DD` 回查/重算） |
+| GET | `/api/v1/reconciliations` | X-API-Key + JWT | 对账记录列表（仅本调用方，可传 `date` 过滤） |
 
 > 所有请求响应头均携带 `X-Request-ID`，日志按请求 ID 串联；业务接口统一返回 `{code, message, data}`。
 
@@ -163,8 +163,12 @@ curl -s -X POST $BASE/api/v1/settlements/submit -H "X-API-Key: $API_KEY" -H "Aut
 curl -s -X POST $BASE/api/v1/settlements/{SETTLEMENT_NO}/reverse \
   -H "X-API-Key: $API_KEY" -H "Authorization: Bearer $SVC_TOKEN"
 
-# 9. 日终对账
-curl -s "$BASE/api/v1/reconciliations/daily?client_id=1" -H "X-API-Key: $API_KEY" -H "Authorization: Bearer $SVC_TOKEN"
+# 9. 日终对账（按 X-API-Key/JWT 中的登录调用方汇总，无需也不能传 client_id 越权）
+curl -s "$BASE/api/v1/reconciliations/daily" -H "X-API-Key: $API_KEY" -H "Authorization: Bearer $SVC_TOKEN"
+
+# 10. 指定历史自然日回查/重算，以及按日期查看自己的对账记录列表
+curl -s "$BASE/api/v1/reconciliations/daily?date=2026-09-23" -H "X-API-Key: $API_KEY" -H "Authorization: Bearer $SVC_TOKEN"
+curl -s "$BASE/api/v1/reconciliations?date=2026-09-23" -H "X-API-Key: $API_KEY" -H "Authorization: Bearer $SVC_TOKEN"
 ```
 
 ## Docker 部署说明

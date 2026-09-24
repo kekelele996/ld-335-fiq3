@@ -67,6 +67,7 @@ func (h *SettlementOrderHandler) Reverse(c *gin.Context) {
 
 // List 历史结算查询。
 // @Summary 结算单列表
+// @Description 仅返回当前登录调用方自己的结算单
 // @Tags settlements
 // @Security ApiKeyAuth
 // @Security BearerAuth
@@ -76,10 +77,9 @@ func (h *SettlementOrderHandler) Reverse(c *gin.Context) {
 // @Success 200 {object} util.Response
 // @Router /api/v1/settlements [get]
 func (h *SettlementOrderHandler) List(c *gin.Context) {
-	clientID := parseUint(c.Query("client_id"))
 	page := parseQueryInt(c.Query("page"), 1)
 	pageSize := parseQueryInt(c.Query("page_size"), 20)
-	orders, total, err := h.svc.ListOrders(c.Request.Context(), clientID, c.Query("status"), page, pageSize)
+	orders, total, err := h.svc.ListOrders(c.Request.Context(), currentClientID(c), c.Query("status"), page, pageSize)
 	if err != nil {
 		c.Error(err)
 		return
