@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"time"
 
 	"github.com/blueship581/gbinsureapi/internal/model"
 	"github.com/blueship581/gbinsureapi/internal/util"
@@ -61,14 +62,11 @@ func (r *SettlementOrderRepository) List(clientID uint, status string, page, pag
 	return orders, total, err
 }
 
-// TodaySettled 当日已结算（对账，date 为 Asia/Shanghai 日期串）。
-func (r *SettlementOrderRepository) TodaySettled(clientID uint, date string) ([]model.SettlementOrder, error) {
+// FindSettledOnDate 查询指定调用方在某自然日 [start, end) 内已结算（含已冲正）的结算单。
+func (r *SettlementOrderRepository) FindSettledOnDate(clientID uint, start, end time.Time) ([]model.SettlementOrder, error) {
 	var orders []model.SettlementOrder
-	q := r.db.Where("settled_at::date = ?", date)
-	if clientID > 0 {
-		q = q.Where("client_id = ?", clientID)
-	}
-	err := q.Find(&orders).Error
+	err := r.db.Where("client_id = ? AND settled_at >= ? AND settled_at < ?", clientID, start, end).
+		Order("settled_at asc").Find(&orders).Error
 	return orders, err
 }
 

@@ -118,8 +118,8 @@ ld-335/
 | POST | `/api/v1/settlements/:settlement_no/reverse` | X-API-Key + JWT | 结算冲正 |
 | GET | `/api/v1/settlements` | X-API-Key + JWT | 结算单列表 |
 | GET | `/api/v1/settlements/:settlement_no` | X-API-Key + JWT | 结算单详情 |
-| GET | `/api/v1/reconciliations/daily` | X-API-Key + JWT | 日终对账 |
-| GET | `/api/v1/reconciliations` | X-API-Key + JWT | 对账记录列表 |
+| GET | `/api/v1/reconciliations/daily` | X-API-Key + JWT | 日终对账（按登录调用方汇总，可传 `date` 回查） |
+| GET | `/api/v1/reconciliations` | X-API-Key + JWT | 对账记录列表（仅本调用方，可传 `date`） |
 
 > 所有请求响应头均携带 `X-Request-ID`，日志按请求 ID 串联；业务接口统一返回 `{code, message, data}`。
 
@@ -163,9 +163,23 @@ curl -s -X POST $BASE/api/v1/settlements/submit -H "X-API-Key: $API_KEY" -H "Aut
 curl -s -X POST $BASE/api/v1/settlements/{SETTLEMENT_NO}/reverse \
   -H "X-API-Key: $API_KEY" -H "Authorization: Bearer $SVC_TOKEN"
 
-# 9. 日终对账
-curl -s "$BASE/api/v1/reconciliations/daily?client_id=1" -H "X-API-Key: $API_KEY" -H "Authorization: Bearer $SVC_TOKEN"
+# 9. 日终对账（按登录调用方汇总当天，重复汇总只覆盖自己的记录；可用 date 回查指定自然日）
+curl -s "$BASE/api/v1/reconciliations/daily?date=2026-09-24" -H "X-API-Key: $API_KEY" -H "Authorization: Bearer $SVC_TOKEN"
+
+# 10. 对账记录列表（仅返回本调用方记录，可按 date 指定自然日回查）
+curl -s "$BASE/api/v1/reconciliations?date=2026-09-24&page=1&page_size=20" -H "X-API-Key: $API_KEY" -H "Authorization: Bearer $SVC_TOKEN"
 ```
+
+### 日终对账口径
+
+- 汇总结果**按调用方（client_id）+ 自然日（reconcile_date）分别保存**：HIS 与第三方药房同一天各自汇总互不影响，同一调用方重复汇总是幂等覆盖（upsert），不会新增或冲掉别家的记录。
+- 日终对账与对账记录列表均**以 JWT 中的登录调用方为准**（不再读取 `client_id` 查询参数），只能查看本调用方的数据。
+- `date` 参数格式 `YYYY-MM-DD`，不传默认今天，支持历史日期回查。
+- 已冲正订单的统计口径：
+  - `total_count` / `total_amount`：保留**原结算笔数与原金额**（含已冲正订单）
+  - `reversed_count` / `reversed_amount`：单独给出**冲正笔数与被冲正的原金额**
+  - `net_amount`：净额 = `total_amount - reversed_amount`（冲正金额从净额扣回）
+  - `success_count` / `fail_count` / `abnormal_orders`：按 settled / failed / pending_manual 状态分类，已冲正订单计入 `reversed_count` 而不计入成功笔数
 
 ## Docker 部署说明
 

@@ -26,6 +26,7 @@ const (
 	LOG_SETTLEMENT_REVERSE_FAILED  = "SettlementOrder reverse failed"
 	LOG_RECONCILIATION_GENERATED   = "DailyReconciliation generated"
 	LOG_RECONCILIATION_FAILED      = "DailyReconciliation generation failed"
+	LOG_RECONCILIATION_DATE_INVALID = "DailyReconciliation date invalid"
 	LOG_AUDIT_WRITTEN              = "AuditLog written"
 	LOG_RATE_LIMITED               = "request rate limited"
 	LOG_REQUEST_START              = "request start"

@@ -16,6 +16,7 @@ var (
 	ErrRateLimited     = errors.New("rate limited")
 	ErrApiKeyInvalid   = errors.New("api key invalid")
 	ErrClientDisabled  = errors.New("client disabled")
+	ErrInvalidDate     = errors.New("invalid date")
 )
 
 // AppError 业务错误。

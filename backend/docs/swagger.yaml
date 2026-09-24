@@ -426,7 +426,12 @@ paths:
       - presettlements
   /api/v1/reconciliations:
     get:
+      description: 仅返回登录调用方自己的日终对账记录，可指定自然日回查
       parameters:
+      - description: 自然日（YYYY-MM-DD）
+        in: query
+        name: date
+        type: string
       - description: 页码
         in: query
         name: page
@@ -448,12 +453,12 @@ paths:
       - reconciliations
   /api/v1/reconciliations/daily:
     get:
-      description: 返回当日总笔数、总金额、成功/失败笔数
+      description: 按登录调用方汇总指定自然日（默认今天）：原结算笔数/金额保留，已冲正订单单独统计冲正笔数并从净额扣回；重复汇总仅覆盖本调用方记录
       parameters:
-      - description: 调用方 ID
+      - description: 对账自然日（YYYY-MM-DD），默认今天
         in: query
-        name: client_id
-        type: integer
+        name: date
+        type: string
       responses:
         "200":
           description: OK

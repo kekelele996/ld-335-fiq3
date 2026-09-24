@@ -507,7 +507,14 @@
                     "reconciliations"
                 ],
                 "summary": "对账记录列表",
+                "description": "仅返回登录调用方自己的日终对账记录，可指定自然日回查",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "自然日（YYYY-MM-DD）",
+                        "name": "date",
+                        "in": "query"
+                    },
                     {
                         "type": "integer",
                         "description": "页码",
@@ -541,16 +548,16 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "返回当日总笔数、总金额、成功/失败笔数",
+                "description": "按登录调用方汇总指定自然日（默认今天）：原结算笔数/金额保留，已冲正订单单独统计冲正笔数并从净额扣回；重复汇总仅覆盖本调用方记录",
                 "tags": [
                     "reconciliations"
                 ],
                 "summary": "日终对账",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "调用方 ID",
-                        "name": "client_id",
+                        "type": "string",
+                        "description": "对账自然日（YYYY-MM-DD），默认今天",
+                        "name": "date",
                         "in": "query"
                     }
                 ],

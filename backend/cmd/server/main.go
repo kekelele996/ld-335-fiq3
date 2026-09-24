@@ -51,6 +51,9 @@ func main() {
 	if err := migrateAndSeed(db, cfg, log); err != nil {
 		panic(fmt.Errorf("migrate database: %w", err))
 	}
+	if err := migrateReconciliationSchema(db); err != nil {
+		panic(fmt.Errorf("migrate reconciliation schema: %w", err))
+	}
 	log.Info(constants.LOG_DB_INITIALIZED)
 
 	clientRepo := repository.NewApiClientRepository(db)
@@ -136,6 +139,31 @@ func migrateAndSeed(db *gorm.DB, cfg config.Config, log *slog.Logger) error {
 	}
 	log.Info(constants.LOG_DB_INITIALIZED, "seed", "ok")
 	return syncDemoClientHashes(db, cfg)
+}
+
+// migrateReconciliationSchema 升级日终对账表：
+// 旧版仅按 reconcile_date 唯一，导致不同调用方同一天汇总互相覆盖；
+// 改为 (client_id, reconcile_date) 复合唯一，并补充冲正/净额列。
+// 语句均为幂等 DDL（IF [NOT] EXISTS），对新版 init.sql / AutoMigrate 建出的表也安全。
+func migrateReconciliationSchema(db *gorm.DB) error {
+	statements := []string{
+		`ALTER TABLE daily_reconciliations ADD COLUMN IF NOT EXISTS client_id BIGINT DEFAULT 0`,
+		`ALTER TABLE daily_reconciliations ADD COLUMN IF NOT EXISTS reversed_count BIGINT DEFAULT 0`,
+		`ALTER TABLE daily_reconciliations ADD COLUMN IF NOT EXISTS reversed_amount DOUBLE PRECISION DEFAULT 0`,
+		`ALTER TABLE daily_reconciliations ADD COLUMN IF NOT EXISTS net_amount DOUBLE PRECISION DEFAULT 0`,
+		`ALTER TABLE daily_reconciliations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now()`,
+		// 旧版表上的日期唯一约束/索引先移除（仅在存在时生效）。
+		`ALTER TABLE daily_reconciliations DROP CONSTRAINT IF EXISTS daily_reconciliations_reconcile_date_key`,
+		`DROP INDEX IF EXISTS idx_daily_reconciliations_reconcile_date`,
+		// 同一调用方同一自然日仅一条汇总，重复汇总只覆盖自己的记录。
+		`CREATE UNIQUE INDEX IF NOT EXISTS uk_recon_client_date ON daily_reconciliations(client_id, reconcile_date)`,
+	}
+	for _, stmt := range statements {
+		if err := db.Exec(stmt).Error; err != nil {
+			return fmt.Errorf("exec %q: %w", stmt, err)
+		}
+	}
+	return nil
 }
 
 // syncDemoClientHashes 确保演示调用方使用当前 API_KEY_SECRET 生成的哈希（init.sql 占位哈希不匹配）。
